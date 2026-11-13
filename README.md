@@ -19,6 +19,14 @@ A live class guide for SLA sessions. Students open the site and see only the car
 
 If you change `Code.gs` later, use Deploy, Manage deployments, edit the deployment, and choose a new version. The URL stays the same.
 
+## Waiting screen and ratings
+
+The first card is a waiting screen that says "Please wait for Josh to move the card". Students cannot see any later card, and cannot look ahead, until you tap Next. It also shows how many students have joined. Before class, tap card 1 at the top of the facilitator view if the site was used earlier, so everyone starts on the waiting screen.
+
+Card 2 asks students to tap 0 to 5 for each target. The projector adds up the ratings with no names, showing the average, the total out of the possible points, and a small chart of how many students picked each number. The last card repeats the ratings and shows the class average before and now. Students do not see the totals on their own screens, so they are not swayed by each other.
+
+The waiting screen only hides the cards in the page. A student who opens the page source can still read the card text.
+
 ## Student names and live work
 
 Students enter a first name and last initial before they see anything. As they type, their answers reach the Student work panel in the facilitator view within a few seconds. Each equation, number, yes or no, and graph is checked automatically, and every field shows how many students have it right. Green dots mean a student was active in the last 45 seconds. The Show menu lets you look back at any card.

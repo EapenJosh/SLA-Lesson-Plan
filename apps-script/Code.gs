@@ -81,6 +81,30 @@ function doGet(e) {
     return out_(s);
   }
 
+  // Anonymous rating totals for the projector. Returns counts only, never names or answers.
+  if (action === 'rate_get') {
+    var rids = readRoster_();
+    var rkeys = rids.map(function (i) { return 'W_' + i; });
+    var rgot = rkeys.length ? CACHE.getAll(rkeys) : {};
+    var counts = {}, n = 0;
+    rids.forEach(function (i) {
+      var raw = rgot['W_' + i];
+      if (!raw) return;
+      try {
+        var rec = JSON.parse(raw);
+        n++;
+        for (var k in rec.v) {
+          if (k.indexOf('rate-') !== 0) continue;
+          var val = parseInt(rec.v[k], 10);
+          if (!(val >= 0 && val <= 5)) continue;
+          if (!counts[k]) counts[k] = [0, 0, 0, 0, 0, 0];
+          counts[k][val]++;
+        }
+      } catch (err) {}
+    });
+    return out_({ ok: true, n: n, counts: counts });
+  }
+
   var a = auth_(p.pass);
   if (a !== 'ok') return out_({ ok: false, error: a });
   if (action === 'login') return out_({ ok: true });

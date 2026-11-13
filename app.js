@@ -15,6 +15,7 @@
   var haveState = false, viewIdx = 0, pinned = false, pending = 0;
   var revealed = {};
   var running = false, startedAt = 0, accMs = 0, clipId = 0;
+  var rateData = { n: 0, counts: {} };
   var me = null, sendTimer = null, workStudents = [], workNow = 0, clearArmed = null, workTimer = null;
   var FIELD = {};
   CARDS.forEach(function (c) { (c.work || []).forEach(function (g) { g.f.forEach(function (f) { FIELD[f.id] = f; }); }); });
@@ -93,11 +94,29 @@
 
   /* ---------- backend ---------- */
   function demoState() { try { return JSON.parse(lsGet('sla:demo') || 'null') || { card: 0, ans: false, rev: 0 }; } catch (e) { return { card: 0, ans: false, rev: 0 }; } }
+  function aggregate(list) {
+    var counts = {};
+    list.forEach(function (s) {
+      var v = s.v || {};
+      Object.keys(v).forEach(function (k) {
+        if (k.indexOf('rate-') !== 0) return;
+        var n = parseInt(v[k], 10);
+        if (!(n >= 0 && n <= 5)) return;
+        (counts[k] = counts[k] || [0, 0, 0, 0, 0, 0])[n]++;
+      });
+    });
+    return { n: list.length, counts: counts };
+  }
   function demoWorkAll() { try { return JSON.parse(lsGet('sla:demo-work') || '{}') || {}; } catch (e) { return {}; } }
   function demoApi(p) {
     if (p.action === 'work') {
       var all = demoWorkAll(); all[p.id] = { name: p.name, v: p.v || {}, t: Date.now() };
       lsSet('sla:demo-work', JSON.stringify(all)); return Promise.resolve({ ok: true });
+    }
+    if (p.action === 'rate_get') {
+      var a1 = demoWorkAll();
+      var ag = aggregate(Object.keys(a1).map(function (k) { return { v: a1[k].v }; }));
+      return Promise.resolve({ ok: true, n: ag.n, counts: ag.counts });
     }
     if (p.action === 'work_get' || p.action === 'work_clear') {
       if (String(p.pass) !== 'demo') return Promise.resolve({ ok: false, error: 'bad' });
@@ -225,6 +244,11 @@
       ['yes', 'no'].forEach(function (o) { h += '<button type="button" class="chip" data-yn="' + o + '" data-fid="' + f.id + '" role="radio" aria-checked="' + (v === o) + '">' + (o === 'yes' ? 'Yes' : 'No') + '</button>'; });
       return h + '<span class="mark" data-mark="' + f.id + '" aria-live="polite"></span></span></div>';
     }
+    if (f.k === 'rate') {
+      h = '<div class="f"><span class="fl">' + esc(f.label) + '</span><span class="inl" role="radiogroup" aria-label="' + esc(f.label) + ', 0 to 5">';
+      for (var r = 0; r <= (f.max || 5); r++) h += '<button type="button" class="chip rb" data-rate="' + r + '" data-fid="' + f.id + '" role="radio" aria-checked="' + (v === String(r)) + '">' + r + '</button>';
+      return h + '</span></div>';
+    }
     if (f.k === 'grid') {
       return '<div class="f gridf" data-fid="' + f.id + '"><span class="fl">' + esc(f.label) + '</span><div class="pad"></div><div class="padbar"><span class="pts"></span><button type="button" class="btn sm" data-clear="' + f.id + '">Clear</button></div><span class="mark" data-mark="' + f.id + '" aria-live="polite"></span></div>';
     }
@@ -233,7 +257,7 @@
   function renderWork(c) {
     var h = '<section class="work"><h3 class="wt">Your work</h3>';
     c.work.forEach(function (g, gi) {
-      var checkable = g.f.some(function (f) { return f.k !== 'text'; });
+      var checkable = g.f.some(function (f) { return f.k !== 'text' && f.k !== 'rate'; });
       h += '<div class="group" data-g="' + gi + '">';
       if (g.t) h += '<h4>' + g.t + '</h4>';
       g.f.forEach(function (f) { h += fieldHtml(f); });
@@ -251,13 +275,15 @@
   function renderCard() {
     var c = CARDS[viewIdx], blk = BLOCKS[c.blk], stage = $('stage');
     stage.style.setProperty('--c', blk.c);
-    var tag = blk.name + (mode === 'admin' ? ' · ' + c.t[0] + ' → ' + c.t[1] + ' min' : '');
+    var tag = c.wait ? 'Before class' : blk.name + (mode === 'admin' ? ' · ' + c.t[0] + ' → ' + c.t[1] + ' min' : '');
     var h = '<header><span class="tag">' + tag + '</span><h2>' + c.title + '</h2></header><div class="body">' + c.body + '</div><div id="ansBox"></div>';
     if (mode === 'student' && !isProjector && c.work) h += renderWork(c);
     stage.innerHTML = h;
     renderGraphs(stage);
     Array.prototype.forEach.call(stage.querySelectorAll('.gridf'), drawPad);
     renderAns();
+    renderRates();
+    if (isProjector) fetchRates();
     if (mode === 'admin') renderNotes();
   }
   function renderNotes() {
@@ -355,6 +381,13 @@
         queueSend();
         return;
       }
+      var rb = t.closest('[data-rate]');
+      if (rb) {
+        var rf = rb.getAttribute('data-fid'); setVal(rf, rb.getAttribute('data-rate'));
+        Array.prototype.forEach.call(document.querySelectorAll('[data-rate][data-fid="' + rf + '"]'), function (b) { b.setAttribute('aria-checked', b === rb ? 'true' : 'false'); });
+        queueSend();
+        return;
+      }
       var ck = t.closest('[data-check]'); if (ck) { runCheck(parseInt(ck.getAttribute('data-check'), 10)); return; }
       var cl = t.closest('[data-clear]');
       if (cl) { var f2 = cl.getAttribute('data-clear'); setVal(f2, '[]'); clearMark(f2); drawPad(document.querySelector('.gridf[data-fid="' + f2 + '"]')); queueSend(); return; }
@@ -407,6 +440,7 @@
     BLOCKS.forEach(function (b, i) { var p = Math.max(0, Math.min(1, (m - starts[i]) / b.min)); $('seg' + i).style.setProperty('--p', (p * 100) + '%'); });
     var pace = $('pace'), txt = $('paceText'), c = CARDS[live.card];
     pace.className = 'pace';
+    if (c.wait) { pace.classList.add('ok'); txt.textContent = 'Students are on the waiting screen. Start the timer when you move to the first card.'; return; }
     if (ms === 0 && !running) { txt.textContent = 'Press Start when class begins.'; return; }
     if (m > TOTAL) { pace.classList.add('late'); txt.textContent = 'Past 50 minutes by ' + fmt(ms - TOTAL * 60000) + '.'; return; }
     if (m < c.t[0]) { pace.classList.add('early'); txt.textContent = 'Ahead of plan. This card is planned for minute ' + c.t[0] + ', you are at ' + fmt(ms) + '.'; }
@@ -476,6 +510,43 @@
   }
   function resetTimer() { running = false; accMs = 0; $('startBtn').textContent = 'Start'; tick(); }
 
+  /* ---------- ratings on the projector ---------- */
+  function rateStats(arr) {
+    var n = 0, sum = 0;
+    if (arr) arr.forEach(function (c, i) { n += c; sum += c * i; });
+    return { n: n, sum: sum, avg: n ? sum / n : null };
+  }
+  function histHtml(arr) {
+    var a = arr || [0, 0, 0, 0, 0, 0], max = Math.max(1, Math.max.apply(null, a)), h = '<div class="hist" aria-hidden="true">';
+    a.forEach(function (c, i) { h += '<div class="hc"><span class="hn">' + (c || '') + '</span><span class="hb" style="height:' + Math.round(c / max * 100) + '%"></span><span class="hl">' + i + '</span></div>'; });
+    return h + '</div>';
+  }
+  function renderRates() {
+    var box = $('rateBox'); if (!box) return;
+    if (!(isProjector || mode === 'admin')) return;
+    var c = CARDS[viewIdx];
+    if (c.joined) { box.innerHTML = '<p class="rhead join">' + rateData.n + ' student' + (rateData.n === 1 ? ' has' : 's have') + ' joined</p>'; return; }
+    if (!c.rates) return;
+    var post = c.rateShow === 'post', h = '<div class="rates"><p class="rhead">' + rateData.n + ' student' + (rateData.n === 1 ? '' : 's') + ' joined' + (post ? '. Class average before and now.' : '. Class totals so far.') + '</p>';
+    c.rates.forEach(function (r) {
+      var now = rateStats(rateData.counts[post ? r.post : r.pre]), before = post ? rateStats(rateData.counts[r.pre]) : null;
+      h += '<div class="rrow"><div class="rlab">' + esc(r.label) + '</div>';
+      if (!now.n) { h += '<div class="rbig muted">Waiting for ratings</div></div>'; return; }
+      if (post) {
+        var d = before && before.n ? now.avg - before.avg : null;
+        h += '<div class="rbig">' + (before && before.n ? before.avg.toFixed(1) + ' \u2192 ' : '') + now.avg.toFixed(1) + '<small>' + (d === null ? '' : (d >= 0 ? '+' : '\u2212') + Math.abs(d).toFixed(1)) + '</small></div>';
+      } else {
+        h += '<div class="rbig">' + now.avg.toFixed(1) + '<small>average out of 5</small></div>';
+      }
+      h += '<div class="rsum">Total ' + now.sum + ' of ' + (now.n * 5) + '<br>' + now.n + ' rated</div>' + histHtml(rateData.counts[post ? r.post : r.pre]) + '</div>';
+    });
+    box.innerHTML = h + '</div>';
+  }
+  function fetchRates() {
+    if (!isProjector || document.hidden || !(CARDS[viewIdx].rates || CARDS[viewIdx].joined)) return;
+    api({ action: 'rate_get' }).then(function (r) { if (r && r.ok) { rateData = { n: r.n || 0, counts: r.counts || {} }; renderRates(); } }).catch(function () {});
+  }
+
   /* ---------- facilitator: live student work ---------- */
   function displayVal(f, raw) {
     if (!raw) return '';
@@ -519,7 +590,10 @@
             var mark = st === true ? '\u2713' : st === 'wip' ? '\u2026' : st === false ? '\u2717' : '';
             rows += '<li class="wrow"><span class="wn">' + esc(s.name) + '</span><span class="wv' + (f.k === 'text' ? ' txt' : '') + '">' + (raw ? esc(displayVal(f, raw)) : '<i>no answer yet</i>') + '</span><span class="wm ' + cls + '">' + mark + '</span></li>';
           });
-          var head = f.k === 'text' ? (answered + ' of ' + list.length + ' wrote something') : (correct + ' of ' + list.length + ' correct');
+          var head;
+          if (f.k === 'text') head = answered + ' of ' + list.length + ' wrote something';
+          else if (f.k === 'rate') { var rs = rateStats(rateData.counts[f.id]); head = rs.n + ' of ' + list.length + ' rated' + (rs.n ? ', average ' + rs.avg.toFixed(1) : ''); }
+          else head = correct + ' of ' + list.length + ' correct';
           h += '<div class="wf"><h4>' + (g.t ? esc(g.t) + ' \u00b7 ' : '') + esc(f.label) + '</h4><p class="wsum">' + head + '</p><ul>' + rows + '</ul></div>';
         });
       });
@@ -530,7 +604,7 @@
   function fetchWork() {
     if (mode !== 'admin' || document.hidden) return;
     api({ action: 'work_get', pass: pass }).then(function (r) {
-      if (r && r.ok) { workStudents = r.students || []; workNow = r.now || Date.now(); renderWorkPanel(); }
+      if (r && r.ok) { workStudents = r.students || []; workNow = r.now || Date.now(); rateData = aggregate(workStudents); renderRates(); renderWorkPanel(); }
     }).catch(function () {});
   }
   function buildWorkSelect() {
@@ -603,6 +677,7 @@
     setInterval(poll, demo ? 600 : (CFG.POLL_MS || 2000));
     setInterval(tick, 500);
     setInterval(sendWork, 20000);
+    if (isProjector) setInterval(fetchRates, 2500);
     if (me) setTimeout(sendWork, 800);
     document.addEventListener('visibilitychange', poll);
   }

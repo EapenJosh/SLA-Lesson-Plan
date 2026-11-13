@@ -18,6 +18,7 @@
   function eq(id, label, m, b, ph) { return { k: 'eq', id: id, label: label, m: m, b: b, ph: ph || 'y = ...' }; }
   function num(id, label, v) { return { k: 'num', id: id, label: label, v: v, ph: 'Type a number' }; }
   function txt(id, label, rows) { return { k: 'text', id: id, label: label, rows: rows || 2 }; }
+  function rate(id, label) { return { k: 'rate', id: id, label: label, max: 5 }; }
   function grd(id, label, m, b, need) { return { k: 'grid', id: id, label: label, m: m, b: b, need: need || 3 }; }
 
   window.BLOCKS = [
@@ -29,12 +30,20 @@
   ];
 
   window.CARDS = [
-    { blk: 0, t: [0, 2], title: 'Fist to five',
-      body: '<p class="lead">Show zero to five fingers for how confident you are on each target.</p>' +
-        '<ol class="big-list"><li><b>L1</b> Is a table linear? If it is, find the equation.</li><li><b>L2</b> Graph a line, and write an equation from a graph.</li><li><b>L3</b> Write an equation for a story, explain m and b, and answer a question.</li></ol>',
-      ask: 'Read each target aloud, then count fingers.',
-      notes: ul(['Tally the numbers somewhere you can compare at the end of class. Your own notes are fine, since you have no board.', 'The lowest count is the target to protect if time runs short.', 'Remind them: no retakes Monday, just these three targets.']),
+    { blk: 0, t: [0, 0], wait: true, joined: true, title: 'Please wait for Josh to move the card',
+      body: '<p class="lead">Keep this page open. Your screen changes on its own when class starts.</p><div id="rateBox" class="ratebox"></div>',
+      ask: 'Welcome students as they arrive. Tap Next when you are ready to start.',
+      notes: ul(['Students cannot see any other card until you tap Next. Looking back is only possible for cards you have already shown.', 'Use this time for attendance and to make sure everyone has entered a name. The count shows how many have joined.', 'If the page was used before, tap card 1 at the top to bring students back to this screen.']),
       work: null, ans: null },
+
+    { blk: 0, t: [0, 2], title: 'Rate your confidence, 0 to 5',
+      body: '<p class="lead">On your device, tap a number from 0 to 5 for how confident you are on each target.</p>' +
+        '<ol class="big-list"><li><b>L1</b> Is a table linear? If it is, find the equation.</li><li><b>L2</b> Graph a line, and write an equation from a graph.</li><li><b>L3</b> Write an equation for a story, explain m and b, and answer a question.</li></ol><div id="rateBox" class="ratebox"></div>',
+      ask: 'Read each target aloud, then ask students to tap a number from 0 to 5 for each one.',
+      notes: ul(['The projector adds up the ratings as students tap, with no names. Your panel below shows who rated what.', 'The lowest average is the target to protect if time runs short.', 'Remind them: no retakes Monday, just these three targets.']),
+      rates: [{ label: 'L1 Tables', pre: 'rate-pre-L1' }, { label: 'L2 Graphs', pre: 'rate-pre-L2' }, { label: 'L3 Applications', pre: 'rate-pre-L3' }], rateShow: 'pre',
+      work: [{ t: 'How confident are you right now? 0 is not at all, 5 is completely.', f: [rate('rate-pre-L1', 'L1 Tables'), rate('rate-pre-L2', 'L2 Graphs'), rate('rate-pre-L3', 'L3 Applications')] }],
+      ans: null },
 
     { blk: 0, t: [2, 5], title: 'What do m and b mean?',
       body: '<div class="formula">y = mx + b</div><p class="lead">Talk with the person next to you, then write it in your own words.</p>',
@@ -140,10 +149,11 @@
       ans: ans('<p><b>L1</b> Linear. y drops 3 as x goes up 1, so m = −3, b = 10. y = −3x + 10.</p><p><b>L2</b> Start (0, 1), down 2 right 1: (1, −1), (2, −3).</p><p><b>L3</b> C = 8m + 12. Slope 8: cost goes up $8 per extra month. Y-intercept 12: the $12 setup fee at 0 months. After 6 months: $60.</p>') },
 
     { blk: 4, t: [48, 50], title: 'Re-rate and close',
-      body: '<p class="lead">Fist to five again. Compare with where you started.</p><ol class="big-list"><li>Which target moved the least? Redo that one first on your own.</li><li>Monday: no retakes, just L1, L2, and L3.</li><li>Your cheat sheet stays on this device. Use Copy all to save it somewhere.</li></ol>',
-      ask: 'Which target do you feel least sure about right now?',
-      notes: ul(['Compare to the tally from the start of class.', 'Say the Monday plan out loud one more time.']),
-      work: [{ t: '', f: [txt('c11-low', 'The target I feel least sure about, and why', 3)] }],
+      body: '<p class="lead">Rate yourself again. Compare with where you started.</p><ol class="big-list"><li>Which target moved the least? Redo that one first on your own.</li><li>Monday: no retakes, just L1, L2, and L3.</li><li>Your cheat sheet stays on this device. Use Copy all to save it somewhere.</li></ol><div id="rateBox" class="ratebox"></div>',
+      ask: 'Which target moved the least? That is the one to redo first on your own.',
+      notes: ul(['The projector shows the class average before and now for each target.', 'Say the Monday plan out loud one more time.']),
+      rates: [{ label: 'L1 Tables', pre: 'rate-pre-L1', post: 'rate-post-L1' }, { label: 'L2 Graphs', pre: 'rate-pre-L2', post: 'rate-post-L2' }, { label: 'L3 Applications', pre: 'rate-pre-L3', post: 'rate-post-L3' }], rateShow: 'post',
+      work: [{ t: 'How confident are you now? 0 is not at all, 5 is completely.', f: [rate('rate-post-L1', 'L1 Tables'), rate('rate-post-L2', 'L2 Graphs'), rate('rate-post-L3', 'L3 Applications')] }, { t: '', f: [txt('c11-low', 'The target I feel least sure about, and why', 3)] }],
       ans: null }
   ];
 })();

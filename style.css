@@ -228,3 +228,28 @@ select { font: inherit; font-size: 0.92rem; color: var(--ink); background: var(-
 .wm.good { color: var(--good); }
 .wm.bad { color: var(--warn); }
 .wm.wip { color: var(--muted); }
+
+/* ratings */
+.ratebox { display: none; }
+body.projector .ratebox, body.admin .ratebox { display: block; }
+.chip.rb { min-width: 48px; padding: 8px 0; text-align: center; font-variant-numeric: tabular-nums; }
+.rates { border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.rhead { color: var(--muted); font-size: 0.95rem; }
+.rrow { display: grid; grid-template-columns: minmax(120px, 0.9fr) minmax(150px, 1.2fr) minmax(110px, 0.8fr) minmax(150px, 1.1fr); gap: 8px 18px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
+@media (max-width: 760px) { .rrow { grid-template-columns: 1fr 1fr; } }
+.rlab { font-weight: 600; font-size: 1.1rem; }
+.rbig { font-family: var(--font-mono); font-size: clamp(1.8rem, 3.4vw, 2.8rem); font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.rbig small { display: block; font-family: var(--font-body); font-size: 0.82rem; color: var(--muted); font-weight: 400; }
+.rbig.muted { font-family: var(--font-body); font-size: 1rem; color: var(--muted); grid-column: span 3; }
+.rsum { font-size: 0.95rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hist { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; height: 76px; align-items: end; }
+.hc { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 2px; }
+.hb { width: 100%; background: var(--c, var(--accent)); border-radius: 3px 3px 0 0; min-height: 2px; opacity: 0.85; }
+.hn { font-size: 0.72rem; color: var(--muted); min-height: 1em; font-variant-numeric: tabular-nums; }
+.hl { font-size: 0.72rem; color: var(--muted); font-family: var(--font-mono); }
+body.projector .rlab { font-size: 1.6rem; }
+body.projector .rsum, body.projector .rhead { font-size: 1.2rem; }
+body.projector .hist { height: 110px; }
+
+.rhead.join { font-size: 1.3rem; color: var(--ink); }
+body.projector .rhead.join { font-size: 2rem; }
