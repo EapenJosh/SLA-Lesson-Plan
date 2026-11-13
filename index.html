@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MTH 108 SLA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <div id="demoBanner" class="demo" hidden>Demo mode. No sync service is connected yet, so the facilitator passcode is "demo" and only tabs on this device stay in sync.</div>
+  <p id="flash" class="flash" role="status"></p>
+
+  <header id="topStudent" class="top">
+    <div class="brand"><b>MTH 108 SLA</b><span>Linear tables, graphs, and applications</span></div>
+    <div class="topright">
+      <span id="status" class="status">Live</span>
+      <button id="sheetBtn" class="btn" type="button">My cheat sheet</button>
+    </div>
+  </header>
+
+  <div id="adminTop" class="admintop" hidden>
+    <div class="top">
+      <div class="brand"><b>Facilitator view</b><span>You control what students see. <span id="status2" class="status">Live</span></span></div>
+      <div class="clock">
+        <div class="time" id="time" aria-label="Elapsed time">00:00<small id="left"></small></div>
+        <button class="btn primary" id="startBtn" type="button">Start</button>
+        <button class="btn" id="resetBtn" type="button">Reset</button>
+      </div>
+    </div>
+    <div class="bar" id="bar" role="group" aria-label="Send students to a block"></div>
+    <div class="pace" id="pace"><span class="dot"></span><span id="paceText">Press Start when class begins.</span></div>
+    <div class="dots" id="dots" role="group" aria-label="Send students to a card"></div>
+  </div>
+
+  <div class="main" id="main">
+    <article class="stage" id="stage" aria-live="polite"></article>
+    <aside class="notes" id="notes" aria-label="Facilitator notes" hidden></aside>
+  </div>
+
+  <nav id="navStudent" class="nav" aria-label="Card navigation">
+    <button class="btn" id="prevBtn" type="button">← Earlier</button>
+    <span class="count" id="count"></span>
+    <span class="navr">
+      <button class="btn" id="nextBtn" type="button">Next →</button>
+      <button class="btn primary" id="liveBtn" type="button" hidden>Back to live</button>
+    </span>
+  </nav>
+
+  <nav id="navAdmin" class="nav adminnav" aria-label="Control the class" hidden>
+    <button class="btn big" id="aPrev" type="button">← Back</button>
+    <span class="mid"><span class="count" id="aCount"></span>
+      <button class="btn big" id="revealBtn" type="button" aria-pressed="false">Show answers to students</button></span>
+    <button class="btn big primary" id="aNext" type="button">Next →</button>
+  </nav>
+
+  <footer class="foot"><button id="loginLink" class="link" type="button">Facilitator</button></footer>
+</div>
+
+<aside id="sheet" class="sheet" hidden aria-label="My cheat sheet">
+  <div class="sheetin">
+    <header><h2>My cheat sheet</h2><button id="sheetClose" class="btn sm" type="button">Close</button></header>
+    <p class="small">This is saved on this device only. Write it in your own words.</p>
+    <label class="f"><span class="fl">L1 Tables</span><textarea data-fid="cheat-L1" rows="5"></textarea></label>
+    <label class="f"><span class="fl">L2 Graphs</span><textarea data-fid="cheat-L2" rows="5"></textarea></label>
+    <label class="f"><span class="fl">L3 Applications</span><textarea data-fid="cheat-L3" rows="5"></textarea></label>
+    <div class="row"><button id="copyBtn" class="btn primary" type="button">Copy all</button><span id="copyMsg" class="small" role="status"></span></div>
+  </div>
+</aside>
+
+<div id="login" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="loginT">
+  <div class="modalin">
+    <h2 id="loginT">Facilitator sign in</h2>
+    <label class="f"><span class="fl">Passcode</span><input id="passIn" type="password" autocomplete="off" autocapitalize="off"></label>
+    <p id="loginErr" class="err" role="status"></p>
+    <div class="row"><button id="loginGo" class="btn primary" type="button">Sign in</button><button id="loginCancel" class="btn" type="button">Cancel</button></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="cards.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
