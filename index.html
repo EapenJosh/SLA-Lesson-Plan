@@ -17,6 +17,7 @@
   <header id="topStudent" class="top">
     <div class="brand"><b>MTH 108 SLA</b><span>Linear tables, graphs, and applications</span></div>
     <div class="topright">
+      <span id="shareNote" class="share" role="status"></span>
       <span id="status" class="status">Live</span>
       <button id="sheetBtn" class="btn" type="button">My cheat sheet</button>
     </div>
@@ -41,6 +42,16 @@
     <aside class="notes" id="notes" aria-label="Facilitator notes" hidden></aside>
   </div>
 
+  <section id="workPanel" class="workpanel" aria-label="Student work" hidden>
+    <div class="wphead">
+      <h3>Student work</h3>
+      <label class="wsel"><span class="small">Show</span>
+        <select id="workSel" aria-label="Which card to show student work for"></select></label>
+      <button id="clearWork" class="btn sm" type="button">Erase all student work</button>
+    </div>
+    <div id="workBody"></div>
+  </section>
+
   <nav id="navStudent" class="nav" aria-label="Card navigation">
     <button class="btn" id="prevBtn" type="button">← Earlier</button>
     <span class="count" id="count"></span>
@@ -57,7 +68,7 @@
     <button class="btn big primary" id="aNext" type="button">Next →</button>
   </nav>
 
-  <footer class="foot"><button id="loginLink" class="link" type="button">Facilitator</button></footer>
+  <footer class="foot"><button id="nameLink" class="link" type="button" hidden></button><button id="loginLink" class="link" type="button">Facilitator</button></footer>
 </div>
 
 <aside id="sheet" class="sheet" hidden aria-label="My cheat sheet">
@@ -70,6 +81,16 @@
     <div class="row"><button id="copyBtn" class="btn primary" type="button">Copy all</button><span id="copyMsg" class="small" role="status"></span></div>
   </div>
 </aside>
+
+<div id="nameGate" class="modal gate" hidden role="dialog" aria-modal="true" aria-labelledby="gateT">
+  <div class="modalin">
+    <h2 id="gateT">Welcome to MTH 108 SLA</h2>
+    <label class="f"><span class="fl">Your first name and last initial</span><input id="nameIn" type="text" maxlength="30" autocomplete="off" autocapitalize="words" placeholder="For example, Ava R"></label>
+    <p class="small">Your facilitator can see your name and your answers during class. They are erased within 6 hours. Please do not use your G number.</p>
+    <p id="nameErr" class="err" role="status"></p>
+    <div class="row"><button id="nameGo" class="btn primary" type="button">Join class</button><button id="gateAdmin" class="link" type="button">Facilitator sign in</button></div>
+  </div>
+</div>
 
 <div id="login" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="loginT">
   <div class="modalin">

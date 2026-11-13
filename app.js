@@ -15,6 +15,7 @@
   var haveState = false, viewIdx = 0, pinned = false, pending = 0;
   var revealed = {};
   var running = false, startedAt = 0, accMs = 0, clipId = 0;
+  var me = null, sendTimer = null, workStudents = [], workNow = 0, clearArmed = null, workTimer = null;
   var FIELD = {};
   CARDS.forEach(function (c) { (c.work || []).forEach(function (g) { g.f.forEach(function (f) { FIELD[f.id] = f; }); }); });
   FIELD['cheat-L1'] = FIELD['cheat-L1'] || { k: 'text', id: 'cheat-L1' };
@@ -31,6 +32,9 @@
   function getVal(fid) { return lsGet('sla:f:' + fid) || ''; }
   function setVal(fid, v) { lsSet('sla:f:' + fid, v); }
   try { revealed = JSON.parse(lsGet('sla:revealed') || '{}') || {}; } catch (e) { revealed = {}; }
+  try { me = JSON.parse(lsGet('sla:me') || 'null'); } catch (e) { me = null; }
+  if (me && (!me.id || !me.name)) me = null;
+  function newId() { var c = 'abcdefghijklmnopqrstuvwxyz0123456789', r = ''; for (var i = 0; i < 12; i++) r += c.charAt(Math.floor(Math.random() * c.length)); return r; }
 
   /* ---------- answer checking ---------- */
   function parseNum(s) {
@@ -89,7 +93,19 @@
 
   /* ---------- backend ---------- */
   function demoState() { try { return JSON.parse(lsGet('sla:demo') || 'null') || { card: 0, ans: false, rev: 0 }; } catch (e) { return { card: 0, ans: false, rev: 0 }; } }
+  function demoWorkAll() { try { return JSON.parse(lsGet('sla:demo-work') || '{}') || {}; } catch (e) { return {}; } }
   function demoApi(p) {
+    if (p.action === 'work') {
+      var all = demoWorkAll(); all[p.id] = { name: p.name, v: p.v || {}, t: Date.now() };
+      lsSet('sla:demo-work', JSON.stringify(all)); return Promise.resolve({ ok: true });
+    }
+    if (p.action === 'work_get' || p.action === 'work_clear') {
+      if (String(p.pass) !== 'demo') return Promise.resolve({ ok: false, error: 'bad' });
+      if (p.action === 'work_clear') { lsSet('sla:demo-work', '{}'); return Promise.resolve({ ok: true }); }
+      var a2 = demoWorkAll();
+      var list = Object.keys(a2).map(function (k) { var r = a2[k]; return { id: k, name: r.name, v: r.v, t: r.t }; });
+      return Promise.resolve({ ok: true, students: list, now: Date.now() });
+    }
     if (p.action === 'get') { var s = demoState(); s.ok = true; return Promise.resolve(s); }
     if (String(p.pass) !== 'demo') return Promise.resolve({ ok: false, error: 'bad' });
     if (p.action === 'login') return Promise.resolve({ ok: true });
@@ -106,6 +122,10 @@
     var q = Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
     var url = CFG.API_URL + (CFG.API_URL.indexOf('?') > -1 ? '&' : '?') + q + '&_=' + Date.now();
     return fetch(url, { redirect: 'follow' }).then(function (r) { return r.json(); });
+  }
+  function apiPost(payload) {
+    if (demo) return demoApi(payload);
+    return fetch(CFG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), redirect: 'follow' }).then(function (r) { return r.json(); });
   }
   function setStatus(s) {
     var el = $('status');
@@ -262,8 +282,46 @@
       BLOCKS.forEach(function (_, i) { $('seg' + i).classList.toggle('cur', i === CARDS[live.card].blk); });
       CARDS.forEach(function (_, i) { var d = $('dot' + i); if (i === live.card) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current'); });
       renderNotes();
+      renderWorkPanel();
       tick();
     }
+  }
+
+  /* ---------- sharing work with the facilitator ---------- */
+  function sharing() { return me && !isProjector && mode === 'student'; }
+  function setShare(ok) {
+    var el = $('shareNote'); if (!el) return;
+    el.className = 'share' + (ok ? '' : ' bad');
+    el.textContent = ok ? 'Your facilitator can see your work' : 'Not reaching your facilitator. Your work is saved here.';
+  }
+  function collectVals() {
+    var v = {};
+    Object.keys(FIELD).forEach(function (fid) { var val = getVal(fid); if (val && val !== '[]') v[fid] = val.slice(0, 2000); });
+    return v;
+  }
+  function sendWork() {
+    if (!sharing()) return;
+    clearTimeout(sendTimer); sendTimer = null;
+    apiPost({ action: 'work', id: me.id, name: me.name, v: collectVals() }).then(function (r) { setShare(!!(r && r.ok)); }).catch(function () { setShare(false); });
+  }
+  function queueSend() { if (!sharing()) return; clearTimeout(sendTimer); sendTimer = setTimeout(sendWork, 1200); }
+
+  /* ---------- name gate ---------- */
+  function updateMeLink() {
+    var el = $('nameLink');
+    if (me && mode === 'student' && !isProjector) { el.hidden = false; el.textContent = 'Joined as ' + me.name + '. Change'; $('shareNote').hidden = false; }
+    else { el.hidden = true; }
+  }
+  function showGate(show) {
+    $('nameGate').hidden = !show;
+    if (show) { $('nameErr').textContent = ''; $('nameIn').value = me ? me.name : ''; setTimeout(function () { $('nameIn').focus(); }, 30); }
+  }
+  function submitName() {
+    var n = $('nameIn').value.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    if (!n) { $('nameErr').textContent = 'Enter your first name.'; return; }
+    me = { id: (me && me.id) || newId(), name: n };
+    lsSet('sla:me', JSON.stringify(me));
+    showGate(false); updateMeLink(); sendWork();
   }
 
   /* ---------- student events ---------- */
@@ -294,11 +352,12 @@
       if (yn) {
         var fid = yn.getAttribute('data-fid'); setVal(fid, yn.getAttribute('data-yn')); clearMark(fid);
         Array.prototype.forEach.call(document.querySelectorAll('[data-yn][data-fid="' + fid + '"]'), function (b) { b.setAttribute('aria-checked', b === yn ? 'true' : 'false'); });
+        queueSend();
         return;
       }
       var ck = t.closest('[data-check]'); if (ck) { runCheck(parseInt(ck.getAttribute('data-check'), 10)); return; }
       var cl = t.closest('[data-clear]');
-      if (cl) { var f2 = cl.getAttribute('data-clear'); setVal(f2, '[]'); clearMark(f2); drawPad(document.querySelector('.gridf[data-fid="' + f2 + '"]')); return; }
+      if (cl) { var f2 = cl.getAttribute('data-clear'); setVal(f2, '[]'); clearMark(f2); drawPad(document.querySelector('.gridf[data-fid="' + f2 + '"]')); queueSend(); return; }
       var pad = t.closest('.pad');
       if (pad) {
         var box = pad.closest('.gridf'), fid2 = box.getAttribute('data-fid');
@@ -309,7 +368,7 @@
         var pts = getPts(fid2), idx = -1;
         pts.forEach(function (p, i) { if (p[0] === gx && p[1] === gy) idx = i; });
         if (idx > -1) pts.splice(idx, 1); else pts.push([gx, gy]);
-        setVal(fid2, JSON.stringify(pts)); clearMark(fid2); drawPad(box);
+        setVal(fid2, JSON.stringify(pts)); clearMark(fid2); drawPad(box); queueSend();
       }
     }
   }
@@ -322,6 +381,7 @@
     setVal(fid, t.value);
     if (t.tagName === 'TEXTAREA') syncText(fid, t.value, t);
     else clearMark(fid);
+    queueSend();
   }
 
   /* ---------- cheat sheet drawer ---------- */
@@ -381,6 +441,9 @@
     $('adminTop').hidden = false; $('navAdmin').hidden = false; $('notes').hidden = false;
     $('topStudent').hidden = true; $('navStudent').hidden = true;
     $('loginLink').textContent = 'Sign out';
+    $('workPanel').hidden = false; $('nameGate').hidden = true; $('nameLink').hidden = true; $('shareNote').hidden = true;
+    buildWorkSelect(); fetchWork();
+    if (!workTimer) workTimer = setInterval(fetchWork, 4000);
     buildAdminChrome();
     viewIdx = live.card; pinned = false;
     renderCard(); updateChrome();
@@ -413,6 +476,80 @@
   }
   function resetTimer() { running = false; accMs = 0; $('startBtn').textContent = 'Start'; tick(); }
 
+  /* ---------- facilitator: live student work ---------- */
+  function displayVal(f, raw) {
+    if (!raw) return '';
+    if (f.k === 'yn') return raw === 'yes' ? 'Yes' : 'No';
+    if (f.k === 'grid') { try { return JSON.parse(raw).map(function (q) { return '(' + q[0] + ', ' + q[1] + ')'; }).join(' ').replace(/-/g, '\u2212'); } catch (e) { return ''; } }
+    return raw;
+  }
+  function statusFor(f, raw) {
+    if (!raw) return null;
+    if (f.k === 'eq') return checkEq(raw, f).ok;
+    if (f.k === 'num') return checkNum(raw, f.v).ok;
+    if (f.k === 'yn') return (raw === 'yes') === f.v;
+    if (f.k === 'grid') {
+      var pts; try { pts = JSON.parse(raw); } catch (e) { return false; }
+      var r = checkGrid(pts, f);
+      if (r.ok) return true;
+      if (pts.length < f.need && pts.every(function (p) { return close(f.m * p[0] + f.b, p[1]); })) return 'wip';
+      return false;
+    }
+    return null;
+  }
+  function renderWorkPanel() {
+    if (mode !== 'admin') return;
+    var sel = $('workSel').value, idx = (sel === 'live') ? live.card : clamp(sel);
+    var c = CARDS[idx], list = workStudents.slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+    var h = '<div class="who">';
+    if (!list.length) h += '<span class="small">No students have joined yet. They appear here after they enter a name.</span>';
+    list.forEach(function (s) { h += '<span class="pill ' + ((workNow - s.t) < 45000 ? 'on' : '') + '">' + esc(s.name) + '</span>'; });
+    h += '</div>';
+    if (!c.work) h += '<p class="small">Card ' + (idx + 1) + ' has no student answers.</p>';
+    else {
+      h += '<div class="wgrid">';
+      c.work.forEach(function (g) {
+        g.f.forEach(function (f) {
+          var answered = 0, correct = 0, rows = '';
+          list.forEach(function (s) {
+            var raw = (s.v || {})[f.id] || '', st = statusFor(f, raw);
+            if (raw) answered++;
+            if (st === true) correct++;
+            var cls = st === true ? 'good' : st === 'wip' ? 'wip' : st === false ? 'bad' : '';
+            var mark = st === true ? '\u2713' : st === 'wip' ? '\u2026' : st === false ? '\u2717' : '';
+            rows += '<li class="wrow"><span class="wn">' + esc(s.name) + '</span><span class="wv' + (f.k === 'text' ? ' txt' : '') + '">' + (raw ? esc(displayVal(f, raw)) : '<i>no answer yet</i>') + '</span><span class="wm ' + cls + '">' + mark + '</span></li>';
+          });
+          var head = f.k === 'text' ? (answered + ' of ' + list.length + ' wrote something') : (correct + ' of ' + list.length + ' correct');
+          h += '<div class="wf"><h4>' + (g.t ? esc(g.t) + ' \u00b7 ' : '') + esc(f.label) + '</h4><p class="wsum">' + head + '</p><ul>' + rows + '</ul></div>';
+        });
+      });
+      h += '</div>';
+    }
+    $('workBody').innerHTML = h;
+  }
+  function fetchWork() {
+    if (mode !== 'admin' || document.hidden) return;
+    api({ action: 'work_get', pass: pass }).then(function (r) {
+      if (r && r.ok) { workStudents = r.students || []; workNow = r.now || Date.now(); renderWorkPanel(); }
+    }).catch(function () {});
+  }
+  function buildWorkSelect() {
+    var sel = $('workSel'); if (sel.options.length) return;
+    var o = document.createElement('option'); o.value = 'live'; o.textContent = 'The card students are on'; sel.appendChild(o);
+    CARDS.forEach(function (c, i) { var op = document.createElement('option'); op.value = i; op.textContent = 'Card ' + (i + 1) + ': ' + c.title; sel.appendChild(op); });
+    sel.addEventListener('change', renderWorkPanel);
+  }
+  function onClearWork() {
+    var b = $('clearWork');
+    if (!clearArmed) {
+      b.textContent = 'Click again to erase everything';
+      clearArmed = setTimeout(function () { clearArmed = null; b.textContent = 'Erase all student work'; }, 5000);
+      return;
+    }
+    clearTimeout(clearArmed); clearArmed = null; b.textContent = 'Erase all student work';
+    api({ action: 'work_clear', pass: pass }).then(function () { workStudents = []; renderWorkPanel(); });
+  }
+
   /* ---------- wire up ---------- */
   function init() {
     if (isProjector) document.body.classList.add('projector');
@@ -434,6 +571,11 @@
     $('aPrev').addEventListener('click', function () { adminSet(live.card - 1, false); });
     $('aNext').addEventListener('click', function () { adminSet(live.card + 1, false); });
     $('revealBtn').addEventListener('click', function () { adminSet(live.card, !live.ans); });
+    $('nameGo').addEventListener('click', submitName);
+    $('nameIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitName(); });
+    $('nameLink').addEventListener('click', function () { showGate(true); });
+    $('gateAdmin').addEventListener('click', function () { showLogin(true); });
+    $('clearWork').addEventListener('click', onClearWork);
     $('startBtn').addEventListener('click', toggleTimer);
     $('resetBtn').addEventListener('click', resetTimer);
     document.addEventListener('keydown', function (e) {
@@ -448,15 +590,20 @@
     var m = null; try { m = sessionStorage.getItem('sla-msg'); sessionStorage.removeItem('sla-msg'); } catch (e) {}
     if (m) $('flash').textContent = m;
     setStatus(demo ? 'demo' : 'online');
+    if (isProjector) $('shareNote').hidden = true;
+    updateMeLink();
+    if (!isProjector && !pass && !me) showGate(true);
     renderCard(); updateChrome();
     api({ action: 'get' }).then(function (s) {
       applyLive(s);
       if (pass && !isProjector) {
-        api({ action: 'login', pass: pass }).then(function (r) { if (r && r.ok) enterAdmin(); else { try { sessionStorage.removeItem('sla-pass'); } catch (e) {} pass = ''; } });
+        api({ action: 'login', pass: pass }).then(function (r) { if (r && r.ok) enterAdmin(); else { try { sessionStorage.removeItem('sla-pass'); } catch (e) {} pass = ''; if (!me) showGate(true); } });
       }
     }).catch(function () { setStatus('offline'); });
     setInterval(poll, demo ? 600 : (CFG.POLL_MS || 2000));
     setInterval(tick, 500);
+    setInterval(sendWork, 20000);
+    if (me) setTimeout(sendWork, 800);
     document.addEventListener('visibilitychange', poll);
   }
   init();
